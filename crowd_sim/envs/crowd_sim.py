@@ -184,10 +184,33 @@ class CrowdSim(gym.Env):
         :param human_num:
         :return:
         """
+        if self.config.sim.has_boundary:
+            self.humans = self.generate_boundary_static_obstacle()
+            human_num = self.config.sim.dynamic_human_num
         # initial min separation distance to avoid danger penalty at beginning
         for i in range(human_num):
             self.humans.append(self.generate_circle_crossing_human())
 
+    def generate_boundary_static_obstacle(self, position=None):
+        # generate a static obstacle with radius = 0.3, v_pref = 1, visible = True, and policy = orca
+
+        obstacle_num = int(self.config.sim.static_human_num / 2)
+        obstacle_radius = 0.5
+
+        right_x = self.config.sim.right_boundary + obstacle_radius
+        left_x = self.config.sim.left_boundary - obstacle_radius
+        obstacles = []
+        for i in range(obstacle_num):
+            left_obstacle = Human(self.config, 'humans')
+            y_pos = -10 + i * (20.0 / (obstacle_num - 1))
+            left_obstacle.set(left_x, y_pos, left_x, y_pos, 0, 0, 0, v_pref=0)
+            left_obstacle.radius = obstacle_radius
+            obstacles.append(left_obstacle)
+            right_obstacle = Human(self.config, 'humans')
+            right_obstacle.set(right_x, y_pos, right_x, y_pos, 0, 0, 0, v_pref=0)
+            right_obstacle.radius = obstacle_radius
+            obstacles.append(right_obstacle)
+        return obstacles
 
     # generate and return a static human
     # position: (px, py) for fixed position, or None for random position
@@ -237,6 +260,24 @@ class CrowdSim(gym.Env):
             py_noise = (np.random.random() - 0.5) * v_pref
             px = self.circle_radius * np.cos(angle) + px_noise
             py = self.circle_radius * np.sin(angle) + py_noise
+            
+            offset = self.config.sim.pos_offset_from_boundary / 2
+            if self.config.sim.has_boundary:
+                if (px + (human.radius + offset)) > self.config.sim.right_boundary:
+                    px = self.config.sim.right_boundary - (human.radius + offset)
+                if (px - (human.radius + offset)) < self.config.sim.left_boundary:
+                    px = self.config.sim.left_boundary + (human.radius + offset)
+            
+            # goal pos
+            angle = np.random.random() * np.pi * 2
+            gx = self.circle_radius * np.cos(angle)
+            if self.config.sim.has_boundary:
+                if (gx + (human.radius + offset)) > self.config.sim.right_boundary:
+                    gx = self.config.sim.right_boundary - (human.radius + offset)
+                if (gx - (human.radius + offset)) < self.config.sim.left_boundary:
+                    gx = self.config.sim.left_boundary + (human.radius + offset)
+            gy = self.circle_radius * np.sin(angle)
+
             collide = False
 
             if self.group_human:
@@ -253,10 +294,14 @@ class CrowdSim(gym.Env):
                             norm((px - agent.gx, py - agent.gy)) < min_dist:
                         collide = True
                         break
+
+            if ((gx - px) ** 2 + (gy - py) ** 2) < (self.config.sim.left_boundary - self.config.sim.right_boundary) ** 2:
+                collide = True
+            
             if not collide:
                 break
 
-        human.set(px, py, -px, -py, 0, 0, 0)
+        human.set(px, py, gx, gy, 0, 0, 0)
         return human
 
 
@@ -478,14 +523,40 @@ class CrowdSim(gym.Env):
         # for FoV environment
         else:
             if self.robot.kinematics == 'unicycle':
+                # angle = np.random.uniform(0, np.pi * 2)
+                # px = self.circle_radius * np.cos(angle)
+                # py = self.circle_radius * np.sin(angle)
+                # while True:
+                #     gx, gy = np.random.uniform(-self.circle_radius, self.circle_radius, 2)
+                #     if np.linalg.norm([px - gx, py - gy]) >= 6:  # 1 was 6
+                #         break
+                # self.robot.set(px, py, gx, gy, 0, 0, np.random.uniform(0, 2*np.pi)) # randomize init orientation
                 angle = np.random.uniform(0, np.pi * 2)
                 px = self.circle_radius * np.cos(angle)
                 py = self.circle_radius * np.sin(angle)
+                py = -self.circle_radius
+                px = np.random.uniform(self.config.sim.left_boundary, self.config.sim.right_boundary)
+                if self.config.sim.has_boundary:
+                    if (px + (self.robot.radius + self.config.sim.pos_offset_from_boundary)) > self.config.sim.right_boundary:
+                        px = self.config.sim.right_boundary - (self.robot.radius + self.config.sim.pos_offset_from_boundary)
+                    if (px - (self.robot.radius + self.config.sim.pos_offset_from_boundary)) < self.config.sim.left_boundary:
+                        px = self.config.sim.left_boundary + (self.robot.radius + self.config.sim.pos_offset_from_boundary)
                 while True:
                     gx, gy = np.random.uniform(-self.circle_radius, self.circle_radius, 2)
+                    gy = self.circle_radius
+                    gx = np.random.uniform(self.config.sim.left_boundary, self.config.sim.right_boundary)
+                    if self.config.sim.has_boundary:
+                        if (gx + (self.robot.radius + self.config.sim.pos_offset_from_boundary)) > self.config.sim.right_boundary:
+                            gx = self.config.sim.right_boundary - (self.robot.radius + self.config.sim.pos_offset_from_boundary)
+                        if (gx - (self.robot.radius + self.config.sim.pos_offset_from_boundary)) < self.config.sim.left_boundary:
+                            gx = self.config.sim.left_boundary + (self.robot.radius + self.config.sim.pos_offset_from_boundary)
                     if np.linalg.norm([px - gx, py - gy]) >= 6:  # 1 was 6
                         break
-                self.robot.set(px, py, gx, gy, 0, 0, np.random.uniform(0, 2*np.pi)) # randomize init orientation
+                gx = -1.25
+                # self.robot.set(px, py, gx, gy, 0, 0, np.random.uniform(0, 2 * np.pi))  # randomize init orientation
+                self.robot.set(
+                    px, py, gx, gy, 0, 0, (1.0 + np.random.uniform(-1, 1) * 0.2) * np.pi / 2
+                )  # randomize init orientation
 
             # randomize starting position and goal position
             else:

@@ -70,8 +70,8 @@ def main():
 
 	if config.sim.render:
 		fig, ax = plt.subplots(figsize=(7, 7))
-		ax.set_xlim(-6, 6)
-		ax.set_ylim(-6, 6)
+		ax.set_xlim(-11, 11)
+		ax.set_ylim(-11, 11)
 		ax.set_xlabel('x(m)', fontsize=16)
 		ax.set_ylabel('y(m)', fontsize=16)
 		plt.ion()

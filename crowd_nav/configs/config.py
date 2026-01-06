@@ -29,10 +29,19 @@ class Config(object):
     # environment settings
     sim = BaseConfig()
     sim.render = False # show GUI for visualization
-    sim.circle_radius = 6 # radius of the circle where all humans start on
-    sim.human_num = 5 # total number of humans
+    sim.circle_radius = 10 # radius of the circle where all humans start on
+    sim.static_human_num = 20
+    sim.dynamic_human_num = 3
+    sim.human_num = sim.static_human_num + sim.dynamic_human_num # total number of humans
     # Group environment: set to true; FoV environment: false
     sim.group_human = False
+
+    # boundary settings
+    sim.has_boundary = True
+    sim.has_boundary_noise = False
+    sim.left_boundary = -2.5
+    sim.right_boundary = 2.5
+    sim.pos_offset_from_boundary = 1.2
 
     # human settings
     humans = BaseConfig()
@@ -67,8 +76,8 @@ class Config(object):
     robot.visible = False  # the robot is visible to humans
     # robot policy: srnn for now
     robot.policy = 'srnn'
-    robot.radius = 0.3  # radius of the robot
-    robot.v_pref = 1  # max velocity of the robot
+    robot.radius = 0.6  # radius of the robot
+    robot.v_pref = 1.7  # max velocity of the robot
     # robot FOV = this values * PI
     robot.FOV = 2.
 
@@ -82,7 +91,8 @@ class Config(object):
     # robot action type
     action_space = BaseConfig()
     # holonomic or unicycle
-    action_space.kinematics = "holonomic"
+    # action_space.kinematics = "holonomic"
+    action_space.kinematics = "unicycle"
 
     # config for ORCA
     orca = BaseConfig()
